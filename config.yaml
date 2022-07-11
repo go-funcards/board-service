@@ -1,0 +1,29 @@
+rules:
+  v1.CreateBoardRequest_Member:
+    MemberId: "required,uuid4"
+    Roles: "required,min=1,dive,min=1,max=50"
+  v1.CreateBoardRequest:
+    BoardId: "required,uuid4"
+    OwnerId: "required,uuid4"
+    Name: "required,max=150"
+    Description: "omitempty,max=1000"
+    Data: "omitempty,max=10000"
+    Type: "oneof=0 1"
+    Members: "omitempty,dive"
+  v1.UpdateBoardRequest_Member:
+    MemberId: "required,uuid4"
+    Roles: "required_if=Delete false,dive,min=1,max=50"
+  v1.UpdateBoardRequest:
+    BoardId: "required,uuid4"
+    Name: "omitempty,max=150"
+    Description: "omitempty,max=1000"
+    Data: "omitempty,max=10000"
+    Members: "omitempty,dive"
+  v1.DeleteBoardRequest:
+    BoardId: "required,uuid4"
+  v1.BoardsRequest:
+    PageSize: "min=1,max=1000"
+    Types: "omitempty,dive,oneof=0 1"
+    BoardIds: "omitempty,dive,uuid4"
+    OwnerIds: "omitempty,dive,uuid4"
+    MemberIds: "omitempty,dive,uuid4"
