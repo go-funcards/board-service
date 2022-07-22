@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/go-funcards/grpc-server v0.0.0-20220722073048-1c1b9fb1e9a1
 	github.com/go-funcards/logger v0.0.0-20220722074106-50392fd0ea10
-	github.com/go-funcards/mongodb v0.0.0-20220722072454-1bd16fb3e5cd
+	github.com/go-funcards/mongodb v0.0.0-20220722114225-1fe7993ef59b
 	github.com/go-funcards/slice v0.0.0-20220707085102-9ce837cb64c6
 	github.com/go-funcards/validate v0.0.0-20220722073435-97492bb63585
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0

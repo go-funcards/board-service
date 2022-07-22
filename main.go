@@ -58,7 +58,7 @@ func main() {
 		v1.BoardsRequest{},
 	}...)
 
-	mongoDB := mongodb.GetDB(cfg.MongoDB.URI, log)
+	mongoDB := mongodb.GetDB(ctx, cfg.MongoDB.URI, log)
 	storage := db.NewStorage(ctx, mongoDB, log)
 
 	register := func(server *grpc.Server) {

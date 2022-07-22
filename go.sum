@@ -30,6 +30,8 @@ github.com/go-funcards/logger v0.0.0-20220722074106-50392fd0ea10 h1:CI6PdzM+aX9X
 github.com/go-funcards/logger v0.0.0-20220722074106-50392fd0ea10/go.mod h1:L12mkIDMJL+er9Bu9OfBczhmJSnr/oQxwSXswX6Z1QY=
 github.com/go-funcards/mongodb v0.0.0-20220722072454-1bd16fb3e5cd h1:xg8U2Oo7XM3NhlFGono/+VWfu3oRb2yO/CJYUmEGK0w=
 github.com/go-funcards/mongodb v0.0.0-20220722072454-1bd16fb3e5cd/go.mod h1:jgD1Stp5vAG9AoUhjaV+k1lUZnegqZNA/hMV2OubG7o=
+github.com/go-funcards/mongodb v0.0.0-20220722114225-1fe7993ef59b h1:e0us0tqFyuk95/srBBgwFMY+Ez9jt31ReVpJ501ttNc=
+github.com/go-funcards/mongodb v0.0.0-20220722114225-1fe7993ef59b/go.mod h1:jgD1Stp5vAG9AoUhjaV+k1lUZnegqZNA/hMV2OubG7o=
 github.com/go-funcards/slice v0.0.0-20220707085102-9ce837cb64c6 h1:tytc3SyCOuzZpANrYHGJzFzdGcsBWWzpy2yEiLsBPWM=
 github.com/go-funcards/slice v0.0.0-20220707085102-9ce837cb64c6/go.mod h1:oHaylI7HUgl6z65LZHWsyroQY2gz9q2bkPZGRqEPox0=
 github.com/go-funcards/validate v0.0.0-20220722073435-97492bb63585 h1:W584yaHsFVd1L1CwXV8pdHp4jYV2oFobVrk+BtoLEgk=

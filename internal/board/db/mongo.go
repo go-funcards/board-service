@@ -112,20 +112,20 @@ func (s *storage) Save(ctx context.Context, model board.Board) error {
 		}),
 	)
 
-	s.log.WithField("board_id", model.BoardID).Info("board update")
+	s.log.WithField("board_id", model.BoardID).Info("board save")
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	result, err := s.c.BulkWrite(ctx, write)
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("board update: %s", mongodb.ErrMsgQuery), err)
+		return fmt.Errorf(fmt.Sprintf("board save: %s", mongodb.ErrMsgQuery), err)
 	}
 
 	s.log.WithFields(logrus.Fields{
 		"board_id": model.BoardID,
 		"result":   result,
-	}).Info("board updated")
+	}).Info("board saved")
 
 	return nil
 }
@@ -134,7 +134,7 @@ func (s *storage) Delete(ctx context.Context, id string) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	s.log.WithField("id", id).Debug("document delete")
+	s.log.WithField("board_id", id).Debug("board delete")
 	result, err := s.c.DeleteOne(ctx, bson.M{"_id": id})
 	if err != nil {
 		return fmt.Errorf(mongodb.ErrMsgQuery, err)
@@ -142,7 +142,7 @@ func (s *storage) Delete(ctx context.Context, id string) error {
 	if result.DeletedCount == 0 {
 		return fmt.Errorf(mongodb.ErrMsgQuery, mongo.ErrNoDocuments)
 	}
-	s.log.WithField("id", id).Debug("document deleted")
+	s.log.WithField("board_id", id).Debug("board deleted")
 
 	return nil
 }
