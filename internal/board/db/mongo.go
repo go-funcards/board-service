@@ -24,12 +24,12 @@ type storage struct {
 	log logrus.FieldLogger
 }
 
-func NewStorage(db *mongo.Database, log logrus.FieldLogger) *storage {
+func NewStorage(ctx context.Context, db *mongo.Database, log logrus.FieldLogger) *storage {
 	s := &storage{
 		c:   db.Collection(collection),
 		log: log,
 	}
-	s.indexes(context.TODO())
+	s.indexes(ctx)
 	return s
 }
 

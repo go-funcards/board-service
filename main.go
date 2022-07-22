@@ -40,6 +40,8 @@ func init() {
 }
 
 func main() {
+	ctx := context.Background()
+
 	log := logger.GetLog().WithFields(logrus.Fields{
 		"service": os.Args[0],
 		"version": fmt.Sprintf("%s.%s.%s", version, buildDate, buildTime),
@@ -57,7 +59,11 @@ func main() {
 	}...)
 
 	mongoDB := mongodb.GetDB(cfg.MongoDB.URI, log)
-	storage := db.NewStorage(mongoDB, log)
+	storage := db.NewStorage(ctx, mongoDB, log)
+
+	register := func(server *grpc.Server) {
+		v1.RegisterBoardServer(server, board.NewBoardServer(storage))
+	}
 
 	lis, err := net.Listen("tcp", cfg.GRPC.Addr)
 	if err != nil {
@@ -66,18 +72,10 @@ func main() {
 
 	log.Infof("bind application to addr: %s", lis.Addr().(*net.TCPAddr).String())
 
-	grpcserver.Start(
-		context.Background(),
-		lis,
-		func(server *grpc.Server) {
-			v1.RegisterBoardServer(server, board.NewBoardServer(storage))
-		},
-		log,
-		grpc.ChainUnaryInterceptor(
-			grpc_recovery.UnaryServerInterceptor(),
-			grpc_logrus.UnaryServerInterceptor(log),
-			mongodb.ErrorUnaryServerInterceptor(),
-			validate.DefaultValidatorUnaryServerInterceptor(),
-		),
-	)
+	grpcserver.Start(ctx, lis, register, log, grpc.ChainUnaryInterceptor(
+		grpc_recovery.UnaryServerInterceptor(),
+		grpc_logrus.UnaryServerInterceptor(log),
+		mongodb.ErrorUnaryServerInterceptor(),
+		validate.DefaultValidatorUnaryServerInterceptor(),
+	))
 }
