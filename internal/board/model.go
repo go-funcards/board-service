@@ -14,48 +14,34 @@ type Member struct {
 }
 
 type Board struct {
-	BoardID     string    `json:"board_id" bson:"_id,omitempty"`
-	OwnerID     string    `json:"owner_id" bson:"owner_id,omitempty"`
-	Name        string    `json:"name" bson:"name,omitempty"`
-	Type        string    `json:"type" bson:"type,omitempty"`
-	Data        string    `json:"data" bson:"theme,omitempty"`
-	Description string    `json:"description" bson:"description,omitempty"`
-	CreatedAt   time.Time `json:"created_at" bson:"created_at,omitempty"`
-	Members     []Member  `json:"members" bson:"members,omitempty"`
+	BoardID   string    `json:"board_id" bson:"_id,omitempty"`
+	OwnerID   string    `json:"owner_id" bson:"owner_id,omitempty"`
+	Name      string    `json:"name" bson:"name,omitempty"`
+	Metadata  string    `json:"metadata" bson:"metadata,omitempty"`
+	CreatedAt time.Time `json:"created_at" bson:"created_at,omitempty"`
+	Members   []Member  `json:"members" bson:"members,omitempty"`
 }
 
 type Filter struct {
-	Types     []string `json:"types,omitempty"`
 	BoardIDs  []string `json:"board_ids,omitempty"`
 	OwnerIDs  []string `json:"owner_ids,omitempty"`
 	MemberIDs []string `json:"member_ids,omitempty"`
 }
 
-func (b Board) Member(role string) Member {
-	for _, m := range b.Members {
-		if slice.Contains(m.Roles, role) {
-			return m
-		}
-	}
-	return Member{}
-}
-
-func (b Board) toResponse() *v1.BoardsResponse_Board {
+func (b Board) toProto() *v1.BoardsResponse_Board {
 	return &v1.BoardsResponse_Board{
-		BoardId:     b.BoardID,
-		OwnerId:     b.OwnerID,
-		Name:        b.Name,
-		Data:        b.Data,
-		Description: b.Description,
-		Type:        v1.BoardType(v1.BoardType_value[b.Type]),
-		CreatedAt:   timestamppb.New(b.CreatedAt),
+		BoardId:   b.BoardID,
+		OwnerId:   b.OwnerID,
+		Name:      b.Name,
+		Metadata:  b.Metadata,
+		CreatedAt: timestamppb.New(b.CreatedAt),
 		Members: slice.Map(b.Members, func(m Member) *v1.BoardsResponse_Board_Member {
-			return m.toResponse()
+			return m.toProto()
 		}),
 	}
 }
 
-func (m Member) toResponse() *v1.BoardsResponse_Board_Member {
+func (m Member) toProto() *v1.BoardsResponse_Board_Member {
 	return &v1.BoardsResponse_Board_Member{
 		MemberId: m.MemberID,
 		Roles:    m.Roles,
@@ -64,13 +50,11 @@ func (m Member) toResponse() *v1.BoardsResponse_Board_Member {
 
 func CreateBoard(in *v1.CreateBoardRequest) Board {
 	return Board{
-		BoardID:     in.GetBoardId(),
-		OwnerID:     in.GetOwnerId(),
-		Name:        in.GetName(),
-		Type:        in.GetType().String(),
-		Data:        in.GetData(),
-		Description: in.GetDescription(),
-		CreatedAt:   time.Now().UTC(),
+		BoardID:   in.GetBoardId(),
+		OwnerID:   in.GetOwnerId(),
+		Name:      in.GetName(),
+		Metadata:  in.GetMetadata(),
+		CreatedAt: time.Now().UTC(),
 		Members: slice.Map(in.GetMembers(), func(item *v1.CreateBoardRequest_Member) Member {
 			return Member{
 				MemberID: item.GetMemberId(),
@@ -82,10 +66,9 @@ func CreateBoard(in *v1.CreateBoardRequest) Board {
 
 func UpdateBoard(in *v1.UpdateBoardRequest) Board {
 	return Board{
-		BoardID:     in.GetBoardId(),
-		Name:        in.GetName(),
-		Data:        in.GetData(),
-		Description: in.GetDescription(),
+		BoardID:  in.GetBoardId(),
+		Name:     in.GetName(),
+		Metadata: in.GetMetadata(),
 		Members: slice.Map(in.GetMembers(), func(item *v1.UpdateBoardRequest_Member) Member {
 			return Member{
 				MemberID: item.GetMemberId(),
@@ -98,9 +81,6 @@ func UpdateBoard(in *v1.UpdateBoardRequest) Board {
 
 func CreateFilter(in *v1.BoardsRequest) Filter {
 	return Filter{
-		Types: slice.Map(in.GetTypes(), func(p v1.BoardType) string {
-			return p.String()
-		}),
 		BoardIDs:  in.GetBoardIds(),
 		OwnerIDs:  in.GetOwnerIds(),
 		MemberIDs: in.GetMemberIds(),

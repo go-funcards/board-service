@@ -6,10 +6,9 @@ import (
 	"github.com/go-funcards/board-service/internal/board"
 	"github.com/go-funcards/mongodb"
 	"github.com/go-funcards/slice"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.uber.org/zap"
 	"time"
 )
 
@@ -21,57 +20,62 @@ const (
 )
 
 type storage struct {
-	c mongodb.Collection[board.Board]
+	c   *mongo.Collection
+	log logrus.FieldLogger
 }
 
-func NewStorage(ctx context.Context, db *mongo.Database, logger *zap.Logger) (*storage, error) {
-	s := &storage{c: mongodb.Collection[board.Board]{
-		Inner: db.Collection(collection),
-		Log:   logger,
-	}}
-
-	if err := s.indexes(ctx); err != nil {
-		return nil, err
+func NewStorage(db *mongo.Database, log logrus.FieldLogger) *storage {
+	s := &storage{
+		c:   db.Collection(collection),
+		log: log,
 	}
-
-	return s, nil
+	s.indexes(context.TODO())
+	return s
 }
 
-func (s *storage) indexes(ctx context.Context) error {
-	name, err := s.c.Inner.Indexes().CreateOne(ctx, mongo.IndexModel{
+func (s *storage) indexes(ctx context.Context) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	name, err := s.c.Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys: bson.D{
 			{"owner_id", 1},
-			{"type", 1},
 			{"created_at", 1},
 			{"members.member_id", 1},
 		},
 	})
-	if err == nil {
-		s.c.Log.Info("index created", zap.String("collection", collection), zap.String("name", name))
+	if err != nil {
+		s.log.WithFields(logrus.Fields{
+			"collection": collection,
+			"error":      err,
+		}).Fatal("index not created")
 	}
-	return err
+
+	s.log.WithFields(logrus.Fields{
+		"collection": collection,
+		"name":       name,
+	}).Info("index created")
 }
 
 func (s *storage) Save(ctx context.Context, model board.Board) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
 	var write []mongo.WriteModel
-	data, err := s.c.ToM(model)
+	data, err := mongodb.ToBson(model)
 	if err != nil {
 		return err
 	}
 
 	delete(data, "_id")
 	delete(data, "owner_id")
-	delete(data, "type")
 	delete(data, "created_at")
 	delete(data, "members")
 
 	if deleteMembers := slice.Map(model.Members, func(item board.Member) string {
 		return item.MemberID
 	}); len(deleteMembers) > 0 {
-		s.c.Log.Info("delete members from board", zap.String("board_id", model.BoardID), zap.Strings("members", deleteMembers))
+		s.log.WithFields(logrus.Fields{
+			"board_id": model.BoardID,
+			"members":  deleteMembers,
+		}).Info("delete board's members")
 
 		write = append(write, mongo.
 			NewUpdateOneModel().
@@ -100,7 +104,6 @@ func (s *storage) Save(ctx context.Context, model board.Board) error {
 			"$set": data,
 			"$setOnInsert": bson.M{
 				"owner_id":   model.OwnerID,
-				"type":       model.Type,
 				"created_at": model.CreatedAt,
 			},
 			"$addToSet": bson.M{
@@ -109,47 +112,78 @@ func (s *storage) Save(ctx context.Context, model board.Board) error {
 		}),
 	)
 
-	s.c.Log.Debug("bulk update")
+	s.log.WithField("board_id", model.BoardID).Info("board update")
 
-	result, err := s.c.Inner.BulkWrite(ctx, write, options.BulkWrite())
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	result, err := s.c.BulkWrite(ctx, write)
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("bulk update: %s", mongodb.ErrMsgQuery), err)
+		return fmt.Errorf(fmt.Sprintf("board update: %s", mongodb.ErrMsgQuery), err)
 	}
 
-	s.c.Log.Info("document updated", zap.String("board_id", model.BoardID), zap.Any("result", result))
+	s.log.WithFields(logrus.Fields{
+		"board_id": model.BoardID,
+		"result":   result,
+	}).Info("board updated")
 
 	return nil
 }
 
 func (s *storage) Delete(ctx context.Context, id string) error {
-	return s.c.DeleteOne(ctx, bson.M{"_id": id})
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	s.log.WithField("id", id).Debug("document delete")
+	result, err := s.c.DeleteOne(ctx, bson.M{"_id": id})
+	if err != nil {
+		return fmt.Errorf(mongodb.ErrMsgQuery, err)
+	}
+	if result.DeletedCount == 0 {
+		return fmt.Errorf(mongodb.ErrMsgQuery, mongo.ErrNoDocuments)
+	}
+	s.log.WithField("id", id).Debug("document deleted")
+
+	return nil
 }
 
 func (s *storage) Find(ctx context.Context, filter board.Filter, index uint64, size uint32) ([]board.Board, error) {
-	return s.c.Find(ctx, s.filter(filter), s.c.FindOptions(index, size).SetSort(bson.D{{"created_at", -1}}))
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	opts := mongodb.FindOptions(index, size).SetSort(bson.D{{"created_at", -1}})
+	cur, err := s.c.Find(ctx, s.build(filter), opts)
+	if err != nil {
+		return nil, fmt.Errorf(mongodb.ErrMsgQuery, err)
+	}
+	return mongodb.DecodeAll[board.Board](ctx, cur)
 }
 
 func (s *storage) Count(ctx context.Context, filter board.Filter) (uint64, error) {
-	return s.c.CountDocuments(ctx, s.filter(filter))
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	total, err := s.c.CountDocuments(ctx, s.build(filter))
+	if err != nil {
+		return 0, fmt.Errorf(mongodb.ErrMsgQuery, err)
+	}
+	return uint64(total), nil
 }
 
-func (s *storage) filter(filter board.Filter) bson.M {
-	f := make(bson.M)
-	if len(filter.Types) > 0 {
-		f["type"] = bson.M{"$in": filter.Types}
-	}
+func (s *storage) build(filter board.Filter) any {
+	f := make(mongodb.Filter, 0)
 	if len(filter.BoardIDs) > 0 {
-		f["_id"] = bson.M{"$in": filter.BoardIDs}
+		f = append(f, mongodb.In("_id", filter.BoardIDs))
 	}
 	if len(filter.OwnerIDs) > 0 && len(filter.MemberIDs) > 0 {
-		f["$or"] = bson.A{
-			bson.M{"owner_id": bson.M{"$in": filter.OwnerIDs}},
-			bson.M{"members.member_id": bson.M{"$in": filter.MemberIDs}},
-		}
+		f = append(f, mongodb.Or(
+			mongodb.In("owner_id", filter.OwnerIDs),
+			mongodb.In("members.member_id", filter.MemberIDs),
+		))
 	} else if len(filter.OwnerIDs) > 0 {
-		f["members.owner_id"] = bson.M{"$in": filter.OwnerIDs}
+		f = append(f, mongodb.In("owner_id", filter.OwnerIDs))
 	} else if len(filter.MemberIDs) > 0 {
-		f["members.member_id"] = bson.M{"$in": filter.MemberIDs}
+		f = append(f, mongodb.In("members.member_id", filter.MemberIDs))
 	}
-	return f
+	return f.Build()
 }

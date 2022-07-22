@@ -18,11 +18,6 @@ service Board {
   rpc GetBoards(BoardsRequest) returns (BoardsResponse);
 }
 
-enum BoardType {
-  UNK_BOARD = 0; // UNKNOWN_BOARD
-  CARDS = 1;
-}
-
 message CreateBoardRequest {
   message Member {
     string member_id = 1;
@@ -32,10 +27,8 @@ message CreateBoardRequest {
   string board_id = 1;
   string owner_id = 2;
   string name = 3;
-  string description = 4;
-  string data = 5;
-  BoardType type = 6;
-  repeated Member members = 7;
+  string metadata = 4;
+  repeated Member members = 5;
 }
 
 message UpdateBoardRequest {
@@ -47,9 +40,8 @@ message UpdateBoardRequest {
 
   string board_id = 1;
   string name = 2;
-  string description = 3;
-  string data = 4;
-  repeated Member members = 5;
+  string metadata = 3;
+  repeated Member members = 4;
 }
 
 message DeleteBoardRequest {
@@ -59,10 +51,9 @@ message DeleteBoardRequest {
 message BoardsRequest {
   uint64 page_index = 1;
   uint32 page_size = 2;
-  repeated BoardType types = 3;
-  repeated string board_ids = 4;
-  repeated string owner_ids = 5;
-  repeated string member_ids = 6;
+  repeated string board_ids = 3;
+  repeated string owner_ids = 4;
+  repeated string member_ids = 5;
 }
 
 message BoardsResponse {
@@ -75,11 +66,9 @@ message BoardsResponse {
     string board_id = 1;
     string owner_id = 2;
     string name = 3;
-    string description = 4;
-    string data = 5;
-    BoardType type = 6;
-    google.protobuf.Timestamp created_at = 7;
-    repeated Member members = 8;
+    string metadata = 4;
+    google.protobuf.Timestamp created_at = 5;
+    repeated Member members = 6;
   }
 
   uint64 total = 1;
