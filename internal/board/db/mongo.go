@@ -29,7 +29,7 @@ func NewStorage(ctx context.Context, db *mongo.Database, log zerolog.Logger) *st
 		c:   db.Collection(collection),
 		log: log.With().Str("storage", "mongodb").Str("collection", collection).Logger(),
 	}
-	//s.indexes(ctx)
+	s.indexes(ctx)
 	return s
 }
 
