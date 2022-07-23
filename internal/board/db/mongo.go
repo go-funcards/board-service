@@ -6,7 +6,7 @@ import (
 	"github.com/go-funcards/board-service/internal/board"
 	"github.com/go-funcards/mongodb"
 	"github.com/go-funcards/slice"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"time"
@@ -21,15 +21,15 @@ const (
 
 type storage struct {
 	c   *mongo.Collection
-	log logrus.FieldLogger
+	log zerolog.Logger
 }
 
-func NewStorage(ctx context.Context, db *mongo.Database, log logrus.FieldLogger) *storage {
+func NewStorage(ctx context.Context, db *mongo.Database, log zerolog.Logger) *storage {
 	s := &storage{
 		c:   db.Collection(collection),
-		log: log,
+		log: log.With().Str("storage", "mongodb").Str("collection", collection).Logger(),
 	}
-	s.indexes(ctx)
+	//s.indexes(ctx)
 	return s
 }
 
@@ -45,16 +45,10 @@ func (s *storage) indexes(ctx context.Context) {
 		},
 	})
 	if err != nil {
-		s.log.WithFields(logrus.Fields{
-			"collection": collection,
-			"error":      err,
-		}).Fatal("index not created")
+		s.log.Fatal().Err(err).Msg("index not created")
 	}
 
-	s.log.WithFields(logrus.Fields{
-		"collection": collection,
-		"name":       name,
-	}).Info("index created")
+	s.log.Info().Str("index.name", name).Msg("index created")
 }
 
 func (s *storage) Save(ctx context.Context, model board.Board) error {
@@ -72,10 +66,10 @@ func (s *storage) Save(ctx context.Context, model board.Board) error {
 	if deleteMembers := slice.Map(model.Members, func(item board.Member) string {
 		return item.MemberID
 	}); len(deleteMembers) > 0 {
-		s.log.WithFields(logrus.Fields{
-			"board_id": model.BoardID,
-			"members":  deleteMembers,
-		}).Info("delete board's members")
+		s.log.Info().
+			Str("board_id", model.BoardID).
+			Strs("members", deleteMembers).
+			Msg("delete board's members")
 
 		write = append(write, mongo.
 			NewUpdateOneModel().
@@ -112,7 +106,7 @@ func (s *storage) Save(ctx context.Context, model board.Board) error {
 		}),
 	)
 
-	s.log.WithField("board_id", model.BoardID).Info("board save")
+	s.log.Info().Str("board_id", model.BoardID).Msg("board save")
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -122,10 +116,7 @@ func (s *storage) Save(ctx context.Context, model board.Board) error {
 		return fmt.Errorf(fmt.Sprintf("board save: %s", mongodb.ErrMsgQuery), err)
 	}
 
-	s.log.WithFields(logrus.Fields{
-		"board_id": model.BoardID,
-		"result":   result,
-	}).Info("board saved")
+	s.log.Info().Str("board_id", model.BoardID).Interface("result", result).Msg("board saved")
 
 	return nil
 }
@@ -134,7 +125,7 @@ func (s *storage) Delete(ctx context.Context, id string) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	s.log.WithField("board_id", id).Debug("board delete")
+	s.log.Debug().Str("board_id", id).Msg("board delete")
 	result, err := s.c.DeleteOne(ctx, bson.M{"_id": id})
 	if err != nil {
 		return fmt.Errorf(mongodb.ErrMsgQuery, err)
@@ -142,7 +133,7 @@ func (s *storage) Delete(ctx context.Context, id string) error {
 	if result.DeletedCount == 0 {
 		return fmt.Errorf(mongodb.ErrMsgQuery, mongo.ErrNoDocuments)
 	}
-	s.log.WithField("board_id", id).Debug("board deleted")
+	s.log.Debug().Str("board_id", id).Msg("board deleted")
 
 	return nil
 }
